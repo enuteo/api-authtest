@@ -1,0 +1,65 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: keycloak
+      MYSQL_USER: keycloak
+      MYSQL_PASSWORD: keycloak
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    depends_on:
+      - mysql
+
+  no-secure-api:
+    image: no-secure-api:latest
+    volumes:
+      - no_secure_api_data:/data
+    depends_on:
+      - keycloak
+
+  secure-api:
+    image: secure-api:latest
+    volumes:
+      - secure_api_data:/data
+    depends_on:
+      - no-secure-api
+
+  secure-api-gateway:
+    image: secure-api-gateway:latest
+    volumes:
+      - secure_api_gateway_data:/data
+    depends_on:
+      - secure-api
+
+  no-secure-api-gateway:
+    image: no-secure-api-gateway:latest
+    volumes:
+      - no_secure_api_gateway_data:/data
+    depends_on:
+      - secure-api-gateway
+
+  api-authtest:
+    image: api-authtest:latest
+    volumes:
+      - api_authtest_data:/data
+    depends_on:
+      - no-secure-api-gateway
+
+volumes:
+  mysql_data:
+  keycloak_data:
+  no_secure_api_data:
+  secure_api_data:
+  secure_api_gateway_data:
+  no_secure_api_gateway_data:
+  api_authtest_data:

@@ -1,0 +1,2 @@
+docker run -p 3306:3306 --name base-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=authtest -d mysql:8.0.33
+docker exec -i base-mysql mysql -uroot -proot authtest < scripts/setup/database/init-script.sql
