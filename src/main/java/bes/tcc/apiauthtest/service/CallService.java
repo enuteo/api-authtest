@@ -66,8 +66,8 @@ public class CallService {
 
 		System.out.println("sending request to: " + requestUrl + " with method: " + method + " and body: " + body);
 		
-		// return httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-		return null;
+		return httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+		// return null;
 
 	}
 
