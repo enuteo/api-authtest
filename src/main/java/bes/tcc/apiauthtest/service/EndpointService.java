@@ -2,8 +2,6 @@ package bes.tcc.apiauthtest.service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
+import org.springframework.core.io.Resource;
 import org.yaml.snakeyaml.Yaml;
 
 import bes.tcc.apiauthtest.dto.Endpoint;
@@ -20,9 +19,9 @@ public class EndpointService {
     
     private static final List<String> httpMethods = Arrays.asList("get", "post", "put", "delete", "patch", "options", "head", "trace");
 
-    public List<Endpoint> readEndpoints(String filePath) throws Exception {
+    public List<Endpoint> readEndpoints(Resource openApiSpec) throws IOException {
 		
-		Map<?, ?> pathsDocument = getMapFromDoc(filePath);
+		Map<?, ?> pathsDocument = getMapFromDoc(openApiSpec);
 		List<Endpoint> endpoints = new ArrayList<>();
 		
 		for (Map.Entry<?, ?> pathEntry : (pathsDocument).entrySet()) {
@@ -57,10 +56,10 @@ public class EndpointService {
 		return value == null ? null : String.valueOf(value);
 	}
 
-	private Map<?, ?> getMapFromDoc(String filePath) throws IOException{
+	private Map<?, ?> getMapFromDoc(Resource openApiSpec) throws IOException{
 
 		Object yamlDocument;
-		try (InputStream input = Files.newInputStream(Paths.get(filePath))) {
+		try (InputStream input = openApiSpec.getInputStream()) {
 			yamlDocument = new Yaml().load(input);
 		}
 
