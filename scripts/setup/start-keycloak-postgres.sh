@@ -10,19 +10,22 @@ POSTGRES_DB="${POSTGRES_DB:-keycloak}"
 POSTGRES_USER="${POSTGRES_USER:-keycloak}"
 KEYCLOAK_ADMIN_USERNAME="${KEYCLOAK_ADMIN_USERNAME:-master}"
 KEYCLOAK_USER_USERNAME="${KEYCLOAK_USER_USERNAME:-user}"
+KEYCLOAK_TEST_ADMIN_USERNAME="${KEYCLOAK_TEST_ADMIN_USERNAME:-admin}"
+KEYCLOAK_NOTUSER_USERNAME="${KEYCLOAK_NOTUSER_USERNAME:-notuser}"
 KEYCLOAK_REALM="${KEYCLOAK_REALM:-authtest}"
 KEYCLOAK_PORT="${KEYCLOAK_PORT:-8080}"
 KEYCLOAK_MANAGEMENT_PORT="${KEYCLOAK_MANAGEMENT_PORT:-9000}"
-POSTGRES_PASSWORD="pass"
-KEYCLOAK_ADMIN_PASSWORD="admpass"
-KEYCLOAK_USER_PASSWORD="userpass"
+KEYCLOAK_TEST_ADMIN_PASSWORD="${KEYCLOAK_TEST_ADMIN_PASSWORD:-adminpass}"
+KEYCLOAK_NOTUSER_PASSWORD="${KEYCLOAK_NOTUSER_PASSWORD:-notuserpass}"
 
 : "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before running this script}"
 : "${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD before running this script}"
 : "${KEYCLOAK_USER_PASSWORD:?Set KEYCLOAK_USER_PASSWORD before running this script}"
 
-if [[ "$KEYCLOAK_ADMIN_USERNAME" == "$KEYCLOAK_USER_USERNAME" ]]; then
-  echo "The Keycloak admin and regular user must have different usernames." >&2
+if [[ "$KEYCLOAK_USER_USERNAME" == "$KEYCLOAK_TEST_ADMIN_USERNAME" \
+  || "$KEYCLOAK_USER_USERNAME" == "$KEYCLOAK_NOTUSER_USERNAME" \
+  || "$KEYCLOAK_TEST_ADMIN_USERNAME" == "$KEYCLOAK_NOTUSER_USERNAME" ]]; then
+  echo "The Keycloak test users must have different usernames." >&2
   exit 1
 fi
 
@@ -131,20 +134,85 @@ docker exec "$KEYCLOAK_CONTAINER_NAME" \
   -s "realm=${KEYCLOAK_REALM}" \
   -s enabled=true >/dev/null
 
-docker exec "$KEYCLOAK_CONTAINER_NAME" \
-  /opt/keycloak/bin/kcadm.sh create users \
-  -r "$KEYCLOAK_REALM" \
-  -s "username=${KEYCLOAK_USER_USERNAME}" \
-  -s enabled=true >/dev/null
+for role in user admin objectrole; do
+  docker exec "$KEYCLOAK_CONTAINER_NAME" \
+    /opt/keycloak/bin/kcadm.sh create roles \
+    -r "$KEYCLOAK_REALM" \
+    -s "name=${role}" >/dev/null
+done
 
-docker exec "$KEYCLOAK_CONTAINER_NAME" \
-  /opt/keycloak/bin/kcadm.sh set-password \
+create_test_user() {
+  local username="$1"
+  local password="$2"
+  local email="$3"
+  local first_name="$4"
+  local last_name="$5"
+  shift 5
+  local roles=("$@")
+
+  docker exec "$KEYCLOAK_CONTAINER_NAME" \
+    /opt/keycloak/bin/kcadm.sh create users \
+    -r "$KEYCLOAK_REALM" \
+    -s "username=${username}" \
+    -s "email=${email}" \
+    -s "firstName=${first_name}" \
+    -s "lastName=${last_name}" \
+    -s emailVerified=true \
+    -s enabled=true >/dev/null
+
+  docker exec "$KEYCLOAK_CONTAINER_NAME" \
+    /opt/keycloak/bin/kcadm.sh set-password \
+    -r "$KEYCLOAK_REALM" \
+    --username "$username" \
+    --new-password "$password" >/dev/null
+
+  for role in "${roles[@]}"; do
+    docker exec "$KEYCLOAK_CONTAINER_NAME" \
+      /opt/keycloak/bin/kcadm.sh add-roles \
+      -r "$KEYCLOAK_REALM" \
+      --uusername "$username" \
+      --rolename "$role" >/dev/null
+  done
+}
+
+create_test_user "$KEYCLOAK_USER_USERNAME" "$KEYCLOAK_USER_PASSWORD" \
+  user@example.test Test User user objectrole
+create_test_user "$KEYCLOAK_TEST_ADMIN_USERNAME" "$KEYCLOAK_TEST_ADMIN_PASSWORD" \
+  admin@example.test Test Admin admin objectrole
+create_test_user "$KEYCLOAK_NOTUSER_USERNAME" "$KEYCLOAK_NOTUSER_PASSWORD" \
+  notuser@example.test Test "No Roles"
+
+notuser_id="$(docker exec "$KEYCLOAK_CONTAINER_NAME" \
+  /opt/keycloak/bin/kcadm.sh get users \
   -r "$KEYCLOAK_REALM" \
-  --username "$KEYCLOAK_USER_USERNAME" \
-  --new-password "$KEYCLOAK_USER_PASSWORD" >/dev/null
+  -q "username=$KEYCLOAK_NOTUSER_USERNAME" \
+  -q exact=true \
+  --fields id \
+  --format csv \
+  --noquotes)"
+notuser_realm_roles="$(docker exec "$KEYCLOAK_CONTAINER_NAME" \
+  /opt/keycloak/bin/kcadm.sh get "users/$notuser_id/role-mappings/realm" \
+  -r "$KEYCLOAK_REALM" \
+  --fields name \
+  --format csv \
+  --noquotes)"
+default_realm_role="default-roles-$KEYCLOAK_REALM"
+case $'\n'"$notuser_realm_roles"$'\n' in
+  *$'\n'"$default_realm_role"$'\n'*)
+    docker exec "$KEYCLOAK_CONTAINER_NAME" \
+      /opt/keycloak/bin/kcadm.sh remove-roles \
+      -r "$KEYCLOAK_REALM" \
+      --uid "$notuser_id" \
+      --rolename "$default_realm_role" >/dev/null
+    ;;
+esac
 
 printf 'Keycloak is ready at http://localhost:%s\n' "$KEYCLOAK_PORT"
 printf 'Admin user: %s (realm: master)\n' "$KEYCLOAK_ADMIN_USERNAME"
-printf 'Regular user: %s (realm: %s)\n' "$KEYCLOAK_USER_USERNAME" "$KEYCLOAK_REALM"
+printf 'Test user: %s (roles: user, objectrole; realm: %s)\n' "$KEYCLOAK_USER_USERNAME" "$KEYCLOAK_REALM"
+printf 'Test admin: %s (roles: admin, objectrole; realm: %s)\n' \
+  "$KEYCLOAK_TEST_ADMIN_USERNAME" "$KEYCLOAK_REALM"
+printf 'Roleless test user: %s (no application roles; realm: %s)\n' \
+  "$KEYCLOAK_NOTUSER_USERNAME" "$KEYCLOAK_REALM"
 printf 'PostgreSQL container: %s (database: %s, user: %s)\n' \
   "$POSTGRES_CONTAINER_NAME" "$POSTGRES_DB" "$POSTGRES_USER"

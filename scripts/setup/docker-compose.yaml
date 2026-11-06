@@ -1,65 +1,144 @@
+name: tcc-local
+
 services:
-  mysql:
-    image: mysql:8.0
+  postgres:
+    image: postgres:16-alpine
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: keycloak
-      MYSQL_USER: keycloak
-      MYSQL_PASSWORD: keycloak
+      POSTGRES_DB: ${POSTGRES_DB:-keycloak}
+      POSTGRES_USER: ${POSTGRES_USER:-keycloak}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   keycloak:
-    image: quay.io/keycloak/keycloak:latest
-    command: start-dev
+    image: quay.io/keycloak/keycloak:26.4.5
+    command: start-dev --http-port=8080 --import-realm
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-keycloak}
+      KC_DB_USERNAME: ${POSTGRES_USER:-keycloak}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-master}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admpass}
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+      - "${KEYCLOAK_MANAGEMENT_PORT:-9000}:9000"
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - ./authtest-realm.json:/opt/keycloak/data/import/authtest-realm.json:ro
     depends_on:
-      - mysql
+      postgres:
+        condition: service_healthy
 
-  no-secure-api:
-    image: no-secure-api:latest
+  keycloak-provision:
+    image: quay.io/keycloak/keycloak:26.4.5
+    entrypoint: ["/bin/bash", "/opt/keycloak-provision/provision-keycloak-users.sh"]
+    environment:
+      KEYCLOAK_SERVER: http://keycloak:8080
+      KEYCLOAK_REALM: authtest
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-master}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admpass}
+      KEYCLOAK_USER_USERNAME: ${AUTHTEST_USER_USERNAME:-user}
+      KEYCLOAK_USER_PASSWORD: ${AUTHTEST_USER_PASSWORD:-userpass}
+      KEYCLOAK_TEST_ADMIN_USERNAME: ${AUTHTEST_ADMIN_USERNAME:-admin}
+      KEYCLOAK_TEST_ADMIN_PASSWORD: ${AUTHTEST_ADMIN_PASSWORD:-adminpass}
+      KEYCLOAK_NOTUSER_USERNAME: ${AUTHTEST_NOTUSER_USERNAME:-notuser}
+      KEYCLOAK_NOTUSER_PASSWORD: ${AUTHTEST_NOTUSER_PASSWORD:-notuserpass}
     volumes:
-      - no_secure_api_data:/data
+      - ./provision-keycloak-users.sh:/opt/keycloak-provision/provision-keycloak-users.sh:ro
     depends_on:
       - keycloak
 
-  secure-api:
-    image: secure-api:latest
-    volumes:
-      - secure_api_data:/data
-    depends_on:
-      - no-secure-api
+  no-secure-api:
+    image: tcc/no-secure-api:${IMAGE_TAG:-local}
+    build:
+      context: ../../../no-secure-api
+    pull_policy: build
+    ports:
+      - "8070:8080"
 
   secure-api-gateway:
-    image: secure-api-gateway:latest
-    volumes:
-      - secure_api_gateway_data:/data
+    image: tcc/secure-api-gateway:${IMAGE_TAG:-local}
+    build:
+      context: ../../../secure-api-gateway
+    pull_policy: build
     depends_on:
-      - secure-api
+      no-secure-api:
+        condition: service_started
+      keycloak-provision:
+        condition: service_completed_successfully
+    ports:
+      - "8090:8090"
+    environment:
+      SERVER_PORT: 8090
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/authtest
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/authtest/protocol/openid-connect/certs
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
+      NO_SECURE_API_URL: http://no-secure-api:8080
 
-  no-secure-api-gateway:
-    image: no-secure-api-gateway:latest
-    volumes:
-      - no_secure_api_gateway_data:/data
+  secure-api:
+    image: tcc/secure-api:${IMAGE_TAG:-local}
+    build:
+      context: ../../../secure-api
+    pull_policy: build
     depends_on:
-      - secure-api-gateway
+      keycloak-provision:
+        condition: service_completed_successfully
+    ports:
+      - "8091:8080"
+    environment:
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/authtest
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/authtest/protocol/openid-connect/certs
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
+
+  auth-api:
+    image: tcc/auth-api:${IMAGE_TAG:-local}
+    build:
+      context: ../../../auth-api
+    pull_policy: build
+    depends_on:
+      keycloak-provision:
+        condition: service_completed_successfully
+    ports:
+      - "8092:8081"
+    environment:
+      SERVER_PORT: 8081
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: authtest
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
 
   api-authtest:
-    image: api-authtest:latest
-    volumes:
-      - api_authtest_data:/data
+    image: tcc/api-authtest:${IMAGE_TAG:-local}
+    user: "${AUTHTEST_UID:-1000}:${AUTHTEST_GID:-1000}"
+    build:
+      context: ../..
+    pull_policy: build
+    profiles:
+      - test
     depends_on:
-      - no-secure-api-gateway
+      - no-secure-api
+      - auth-api
+      - secure-api-gateway
+    environment:
+      AUTHTEST_BASE_URL: http://secure-api:8080
+      AUTHTEST_AUTH_URL: http://auth-api:8081/auth/login
+      AUTHTEST_USER_USERNAME: ${AUTHTEST_USER_USERNAME:-user}
+      AUTHTEST_USER_PASSWORD: ${AUTHTEST_USER_PASSWORD:-userpass}
+      AUTHTEST_ADMIN_USERNAME: ${AUTHTEST_ADMIN_USERNAME:-admin}
+      AUTHTEST_ADMIN_PASSWORD: ${AUTHTEST_ADMIN_PASSWORD:-adminpass}
+      AUTHTEST_NOTUSER_USERNAME: ${AUTHTEST_NOTUSER_USERNAME:-notuser}
+      AUTHTEST_NOTUSER_PASSWORD: ${AUTHTEST_NOTUSER_PASSWORD:-notuserpass}
+      AUTHTEST_REPORT_PATH: /reports/authtest-report.txt
+    volumes:
+      - ./reports:/reports
 
 volumes:
-  mysql_data:
+  postgres_data:
   keycloak_data:
-  no_secure_api_data:
-  secure_api_data:
-  secure_api_gateway_data:
-  no_secure_api_gateway_data:
-  api_authtest_data:

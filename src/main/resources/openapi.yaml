@@ -1,20 +1,21 @@
 openapi: 3.0.3
 info:
-  title: No Secure API
+  title: Secure API
   version: 1.0.0
   description: |
-    Documentation for the unauthenticated no-secure-api.
+    Documentation for secure-api. GET /object/{id} requires the objectrole role.
 servers:
   - url: /
 paths:
-  /api/object/{id}:
+  /object/{id}:
     get:
       summary: Get an object by ID
       description: |
-        Retrieves an object using its numeric ID. The current implementation
-        does not look up the requested ID and always returns the placeholder
-        object shown in the response example.
+        Retrieves an object using its numeric ID. Requires a valid Keycloak
+        bearer token with the objectrole role.
       operationId: getObjectById
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -36,7 +37,16 @@ paths:
                 name: null
         '400':
           description: The path ID is not a valid 64-bit integer.
+        '401':
+          description: A valid bearer token is required.
+        '403':
+          description: The token does not have the objectrole role.
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     MyObject:
       type: object

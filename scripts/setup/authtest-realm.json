@@ -1,0 +1,58 @@
+{
+  "realm": "authtest",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "user" },
+      { "name": "admin" },
+      { "name": "objectrole" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "auth-api-test",
+      "name": "auth-api-test",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ],
+  "users": [
+    {
+      "username": "user",
+      "email": "user@example.test",
+      "firstName": "Test",
+      "lastName": "User",
+      "emailVerified": true,
+      "enabled": true,
+      "requiredActions": [],
+      "realmRoles": ["user", "objectrole"]
+    },
+    {
+      "username": "admin",
+      "email": "admin@example.test",
+      "firstName": "Test",
+      "lastName": "Admin",
+      "emailVerified": true,
+      "enabled": true,
+      "requiredActions": [],
+      "realmRoles": ["admin", "objectrole"]
+    },
+    {
+      "username": "notuser",
+      "email": "notuser@example.test",
+      "firstName": "Test",
+      "lastName": "No Roles",
+      "emailVerified": true,
+      "enabled": true,
+      "requiredActions": [],
+      "realmRoles": []
+    }
+  ]
+}

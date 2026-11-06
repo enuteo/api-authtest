@@ -2,15 +2,11 @@ package bes.tcc.apiauthtest.service;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
@@ -20,8 +16,6 @@ import bes.tcc.apiauthtest.util.RequestUtils;
 @Service 
 public class CallService {
 
-	private static final Pattern PATH_PARAMETER = Pattern.compile("\\{([^/{}]+)\\}");
-
 	private final HttpClient httpClient = HttpClient.newHttpClient();
 
 	public HttpResponse<String> call(
@@ -30,9 +24,35 @@ public class CallService {
 			Map<String, String> pathParameters,
 			Map<String, String> queryParameters,
 			Map<String, String> headers,
-			String body
+			String body,
+			String bearerToken
     ) throws IOException, InterruptedException {
+		if (bearerToken == null || bearerToken.isBlank()) {
+			throw new IllegalArgumentException("A bearer token is required to call the API.");
+		}
+		return callRequest(endpoint, baseUrl, pathParameters, queryParameters, headers, body, bearerToken);
+	}
 
+	public HttpResponse<String> callWithoutAuthentication(
+			Endpoint endpoint,
+			String baseUrl,
+			Map<String, String> pathParameters,
+			Map<String, String> queryParameters,
+			Map<String, String> headers,
+			String body
+	) throws IOException, InterruptedException {
+		return callRequest(endpoint, baseUrl, pathParameters, queryParameters, headers, body, null);
+	}
+
+	private HttpResponse<String> callRequest(
+			Endpoint endpoint,
+			String baseUrl,
+			Map<String, String> pathParameters,
+			Map<String, String> queryParameters,
+			Map<String, String> headers,
+			String body,
+			String bearerToken
+	) throws IOException, InterruptedException {
 		String endpointPath = RequestUtils.replacePathParameters(endpoint.getUrl(), pathParameters);
 		String requestUrl = RequestUtils.joinUrl(baseUrl, endpointPath);
 		requestUrl = RequestUtils.appendQueryParameters(requestUrl, queryParameters);
@@ -51,7 +71,14 @@ public class CallService {
 				.method(method, bodyPublisher);
 
 		if (headers != null) {
-			headers.forEach(requestBuilder::header);
+			headers.forEach((name, value) -> {
+				if (!name.equalsIgnoreCase("Authorization")) {
+					requestBuilder.header(name, value);
+				}
+			});
+		}
+		if (bearerToken != null) {
+			requestBuilder.setHeader("Authorization", "Bearer " + bearerToken);
 		}
 
 		if (body != null && (
@@ -64,10 +91,7 @@ public class CallService {
 			requestBuilder.header("Content-Type", "application/json");
 		}
 
-		System.out.println("sending request to: " + requestUrl + " with method: " + method + " and body: " + body);
-		
 		return httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
-		// return null;
 
 	}
 
