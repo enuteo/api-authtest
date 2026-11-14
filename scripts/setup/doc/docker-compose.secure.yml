@@ -41,21 +41,6 @@ services:
     expose:
       - "8080"
 
-  secure-api-gateway:
-    image: tcc/secure-api-gateway:${IMAGE_TAG:-local}
-    depends_on:
-      - no-secure-api
-    ports:
-      - "8090:8090"
-    environment:
-      SERVER_PORT: 8090
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8080/realms/authtest}
-      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://host.docker.internal:8080/realms/authtest/protocol/openid-connect/certs}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
-      NO_SECURE_API_URL: http://no-secure-api:8080
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
   secure-api:
     image: tcc/secure-api:${IMAGE_TAG:-local}
     depends_on:

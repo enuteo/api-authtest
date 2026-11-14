@@ -8,7 +8,6 @@ SERVICES=(
   auth-api
   no-secure-api
   secure-api
-  secure-api-gateway
 )
 
 if ! command -v docker >/dev/null 2>&1; then

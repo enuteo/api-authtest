@@ -8,7 +8,7 @@ Na pasta `tcc`, execute:
 ./api-authtest/scripts/setup/doc/build-images.sh
 ```
 
-O script compila os cinco projetos e cria imagens locais com a tag `local`.
+O script compila os quatro projetos e cria imagens locais com a tag `local`.
 Para usar outra tag, defina `IMAGE_TAG`, por exemplo `IMAGE_TAG=dev ./build-images.sh`.
 
 ## Subir os serviços
@@ -26,8 +26,7 @@ docker compose -f docker-compose.all.yml up -d
 ```
 
 As pilhas seguras e inseguras têm nomes de projeto separados e podem rodar
-simultaneamente. A pilha segura inclui o `no-secure-api` apenas como backend
-interno do gateway; ela não publica esse backend na porta insegura.
+simultaneamente.
 
 Também é possível iniciar o stack local integrado a partir de
 `api-authtest/scripts/setup` com `docker compose up`. Esse arquivo constrói as
@@ -37,7 +36,6 @@ imagens `tcc/*:local` se necessário e inclui PostgreSQL e Keycloak com o realm
 | Serviço | Porta local |
 |---|---:|
 | no-secure-api | 8070 |
-| secure-api-gateway | 8090 |
 | secure-api | 8091 |
 | auth-api | 8092 |
 

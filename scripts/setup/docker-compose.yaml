@@ -85,25 +85,6 @@ services:
     ports:
       - "8070:8080"
 
-  secure-api-gateway:
-    image: tcc/secure-api-gateway:${IMAGE_TAG:-local}
-    build:
-      context: ../../../secure-api-gateway
-    pull_policy: build
-    depends_on:
-      no-secure-api:
-        condition: service_started
-      keycloak-provision:
-        condition: service_completed_successfully
-    ports:
-      - "8090:8090"
-    environment:
-      SERVER_PORT: 8090
-      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/authtest
-      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/authtest/protocol/openid-connect/certs
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
-      NO_SECURE_API_URL: http://no-secure-api:8080
-
   secure-api:
     image: tcc/secure-api:${IMAGE_TAG:-local}
     build:
@@ -151,7 +132,6 @@ services:
     depends_on:
       - no-secure-api
       - auth-api
-      - secure-api-gateway
     environment:
       AUTHTEST_BASE_URL: http://secure-api:8080
       AUTHTEST_AUTH_URL: http://auth-api:8081/auth/login
