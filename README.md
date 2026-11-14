@@ -31,6 +31,43 @@ A ferramenta usa por padrão a especificação OpenAPI em `openapi.yaml`, alinha
 ao `secure-api` (`GET /object/{id}`), e aponta para `http://localhost:8091`.
 No Docker Compose, a URL interna é `http://secure-api:8080`.
 
+## Configuração de BOLA (dono de cada objeto)
+
+Para testar BOLA, a ferramenta precisa saber quem é o dono de cada objeto. Isso fica
+em `src/main/resources/objects.yaml` (ou no arquivo indicado por
+`AUTHTEST_OBJECTS_SPEC`, por exemplo `file:/config/objects.yaml`). Para cada operação do
+OpenAPI, no formato `MÉTODO /caminho`, o arquivo lista os objetos usados no teste, os
+parâmetros que identificam cada objeto e o usuário dono:
+
+```yaml
+objects:
+  - operation: GET /object/{id}
+    instances:
+      - id: objeto-do-user
+        owner: "${AUTHTEST_USER_USERNAME:user}"
+        pathParameters:
+          id: "1"
+      - id: objeto-do-admin
+        owner: "${AUTHTEST_ADMIN_USERNAME:admin}"
+        sharedWith: []          # opcional: outros usuários com acesso
+        pathParameters:
+          id: "2"
+        queryParameters: {}     # opcional: parâmetros de consulta
+```
+
+Cada usuário de `users.yaml` chama cada objeto declarado, e o relatório registra, antes
+da resposta, o objeto, o dono e o acesso esperado: `ALLOWED (owner)` para o dono,
+`ALLOWED (shared with user)` para quem está em `sharedWith`, `DENIED (not owner)`
+para os demais usuários e `DENIED (no credentials)` na chamada sem token. Um usuário que
+não é dono e recebe sucesso indica BOLA. A ferramenta ainda não emite o veredito; o
+relatório mostra o esperado ao lado da resposta recebida.
+
+O arquivo é validado antes de qualquer requisição: a operação precisa existir no OpenAPI,
+o dono e os usuários de `sharedWith` precisam existir em `users.yaml`, todos os
+parâmetros de caminho da operação precisam ter valor e não pode haver operação nem `id`
+de objeto repetidos. Operações que não aparecem no arquivo, ou a ausência do arquivo,
+mantêm o comportamento anterior (parâmetros padrão).
+
 ## Keycloak e PostgreSQL
 
 Para iniciar containers locais do PostgreSQL e do Keycloak, defina as variáveis
