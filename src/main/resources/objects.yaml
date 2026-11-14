@@ -1,0 +1,28 @@
+# Configuração de BOLA: quem é dono de cada objeto usado nos testes.
+#
+# Para cada operação do OpenAPI ("MÉTODO /caminho", igual ao openapi.yaml), liste os
+# objetos que serão testados. Cada usuário de users.yaml chama cada objeto, e o relatório
+# registra o acesso esperado: ALLOWED para o dono (e para quem estiver em sharedWith),
+# DENIED para os demais. Um usuário que não é dono e recebe sucesso indica BOLA.
+#
+# Campos de cada objeto:
+#   id               rótulo livre do objeto (aparece no relatório)
+#   owner            usuário dono do objeto (precisa existir em users.yaml)
+#   sharedWith       opcional: outros usuários que também podem acessar o objeto
+#   pathParameters   valores dos parâmetros de caminho da operação (todos obrigatórios)
+#   queryParameters  opcional: parâmetros de consulta que identificam o objeto
+#
+# Valores aceitam variáveis de ambiente, como em users.yaml: "${NOME:padrão}".
+# Operações que não aparecem aqui são executadas como antes, com os parâmetros padrão.
+# Para usar outro arquivo, defina AUTHTEST_OBJECTS_SPEC (ex.: file:/config/objects.yaml).
+objects:
+  - operation: GET /object/{id}
+    instances:
+      - id: objeto-do-user
+        owner: "${AUTHTEST_USER_USERNAME:user}"
+        pathParameters:
+          id: "1"
+      - id: objeto-do-admin
+        owner: "${AUTHTEST_ADMIN_USERNAME:admin}"
+        pathParameters:
+          id: "2"
