@@ -10,16 +10,20 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.io.Resource;
 
+import bes.tcc.apiauthtest.dto.AuthenticationConfig;
 import bes.tcc.apiauthtest.dto.Endpoint;
+import bes.tcc.apiauthtest.dto.ObjectAccessConfig;
 import bes.tcc.apiauthtest.service.AuthenticationConfigService;
 import bes.tcc.apiauthtest.service.EndpointExecutionService;
 import bes.tcc.apiauthtest.service.EndpointService;
+import bes.tcc.apiauthtest.service.ObjectAccessConfigService;
 
 @SpringBootApplication
 public class ApiAuthtestApplication implements CommandLineRunner {
 
 	private final EndpointService endpointService;
 	private final AuthenticationConfigService authenticationConfigService;
+	private final ObjectAccessConfigService objectAccessConfigService;
 	private final EndpointExecutionService endpointExecutionService;
 	private final Resource openApiSpec;
 	private final String baseUrl;
@@ -28,12 +32,14 @@ public class ApiAuthtestApplication implements CommandLineRunner {
 	public ApiAuthtestApplication(
 			EndpointService endpointService,
 			AuthenticationConfigService authenticationConfigService,
+			ObjectAccessConfigService objectAccessConfigService,
 			EndpointExecutionService endpointExecutionService,
 			@Value("${AUTHTEST_SPEC:classpath:openapi.yaml}") Resource openApiSpec,
 			@Value("${AUTHTEST_BASE_URL:http://localhost:8091}") String baseUrl,
 			@Value("${AUTHTEST_REPORT_PATH:authtest-report.txt}") Path reportPath) {
 		this.endpointService = endpointService;
 		this.authenticationConfigService = authenticationConfigService;
+		this.objectAccessConfigService = objectAccessConfigService;
 		this.endpointExecutionService = endpointExecutionService;
 		this.openApiSpec = openApiSpec;
 		this.baseUrl = baseUrl;
@@ -53,8 +59,10 @@ public class ApiAuthtestApplication implements CommandLineRunner {
 	public void run(String... args) throws Exception {
 
 		List<Endpoint> endpoints = endpointService.readEndpoints(openApiSpec);
+		AuthenticationConfig authentication = authenticationConfigService.read();
+		ObjectAccessConfig objectAccess = objectAccessConfigService.read(authentication, endpoints);
 		Path generatedReport = endpointExecutionService.execute(
-				authenticationConfigService.read(), endpoints, baseUrl, pathParameters, reportPath);
+				authentication, objectAccess, endpoints, baseUrl, pathParameters, reportPath);
 		System.out.println("Report written to " + generatedReport);
 	}
 
