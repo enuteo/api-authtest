@@ -19,7 +19,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -84,7 +86,17 @@ public class EndpointExecutionService {
 				for (Endpoint endpoint : endpoints) {
 					Optional<ObjectAccessRule> rule = objectAccess.ruleFor(endpoint);
 					if (rule.isEmpty()) {
-						callAuthenticated(report, user, token, endpoint, baseUrl, pathParameters, null, null);
+						List<Map<String, String>> userPathParameters =
+								pathParametersForUser(endpoint, pathParameters, user.objects());
+						if (userPathParameters.isEmpty()) {
+							appendEndpoint(report, endpoint);
+							report.append("Objects: ").append(user.objects()).append('\n')
+									.append("Request: skipped; no objects configured\n");
+						}
+						for (Map<String, String> requestPathParameters : userPathParameters) {
+							callAuthenticated(report, user, token, endpoint, baseUrl,
+									requestPathParameters, null, null);
+						}
 						continue;
 					}
 					for (ObjectInstance object : rule.get().objects()) {
@@ -125,6 +137,9 @@ public class EndpointExecutionService {
 			Map<String, String> queryParameters,
 			ObjectInstance object) throws IOException, InterruptedException {
 		appendEndpoint(report, endpoint);
+		if (object == null && endpoint.getUrl().contains("{id}")) {
+			report.append("Objects: ").append(user.objects()).append('\n');
+		}
 		String expected = null;
 		if (object != null) {
 			expected = expectedAccess(object, user.username());
@@ -222,10 +237,23 @@ public class EndpointExecutionService {
 						: response.body() + "\n");
 	}
 
+	private List<Map<String, String>> pathParametersForUser(
+			Endpoint endpoint, Map<String, String> defaults, List<Long> objectIds) {
+		if (!endpoint.getUrl().contains("{id}")) {
+			return List.of(defaults);
+		}
+		List<Map<String, String>> parameters = new ArrayList<>();
+		for (Long objectId : objectIds) {
+			Map<String, String> values = new HashMap<>(defaults);
+			values.put("id", objectId.toString());
+			parameters.add(Map.copyOf(values));
+		}
+		return parameters;
+	}
+
 	private String consoleObjectSuffix(ObjectInstance object, String expected) {
 		return object == null ? "" : " [object " + object.label() + ", expected " + expected + "]";
 	}
-
 	private Path writeReport(Path configuredPath, Instant runInstant, String content) throws IOException {
 		Path absolutePath = configuredPath.toAbsolutePath();
 		Path parent = absolutePath.getParent();

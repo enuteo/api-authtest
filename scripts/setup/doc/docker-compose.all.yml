@@ -1,0 +1,104 @@
+name: tcc-all
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-keycloak}
+      POSTGRES_USER: ${POSTGRES_USER:-keycloak}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  base-objects-init:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-keycloak}
+      PGUSER: ${POSTGRES_USER:-keycloak}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
+    volumes:
+      - ../database/base-objects.sql:/base-objects.sql:ro
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/base-objects.sql"]
+
+  no-secure-api:
+    image: tcc/no-secure-api:${IMAGE_TAG:-local}
+    depends_on:
+      base-objects-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-keycloak}
+      DATABASE_USERNAME: ${POSTGRES_USER:-keycloak}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
+    ports:
+      - "8070:8080"
+
+  secure-api-gateway:
+    image: tcc/secure-api-gateway:${IMAGE_TAG:-local}
+    depends_on:
+      - no-secure-api
+    ports:
+      - "8090:8090"
+    environment:
+      SERVER_PORT: 8090
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8080/realms/authtest}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://host.docker.internal:8080/realms/authtest/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
+      NO_SECURE_API_URL: http://no-secure-api:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  secure-api:
+    image: tcc/secure-api:${IMAGE_TAG:-local}
+    depends_on:
+      base-objects-init:
+        condition: service_completed_successfully
+    ports:
+      - "8091:8080"
+    environment:
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8080/realms/authtest}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://host.docker.internal:8080/realms/authtest/protocol/openid-connect/certs}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-keycloak}
+      DATABASE_USERNAME: ${POSTGRES_USER:-keycloak}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  auth-api:
+    image: tcc/auth-api:${IMAGE_TAG:-local}
+    ports:
+      - "8092:8081"
+    environment:
+      SERVER_PORT: 8081
+      KEYCLOAK_BASE_URL: http://host.docker.internal:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-authtest}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  api-authtest:
+    image: tcc/api-authtest:${IMAGE_TAG:-local}
+    profiles:
+      - test
+    depends_on:
+      - secure-api
+      - auth-api
+    environment:
+      AUTHTEST_BASE_URL: http://secure-api:8080
+      AUTHTEST_AUTH_URL: http://auth-api:8081/auth/login
+      AUTHTEST_USER_USERNAME: ${AUTHTEST_USER_USERNAME:-user}
+      AUTHTEST_USER_PASSWORD: ${AUTHTEST_USER_PASSWORD:-userpass}
+      AUTHTEST_ADMIN_USERNAME: ${AUTHTEST_ADMIN_USERNAME:-admin}
+      AUTHTEST_ADMIN_PASSWORD: ${AUTHTEST_ADMIN_PASSWORD:-adminpass}
+
+volumes:
+  postgres_data:

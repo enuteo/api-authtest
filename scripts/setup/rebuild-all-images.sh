@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-TCC_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
-BUILD_SCRIPT="$TCC_ROOT/build-images.sh"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
+SETUP_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+TCC_ROOT="$(cd -- "$SETUP_ROOT/../../.." && pwd)"
+BUILD_SCRIPT="$SETUP_ROOT/doc/build-images.sh"
+IMAGE_TAG="${IMAGE_TAG:-local}"
 SERVICES=(
   api-authtest
   auth-api
@@ -35,7 +36,7 @@ for service in "${SERVICES[@]}"; do
   image="tcc/${service}:${IMAGE_TAG}"
   if docker image inspect "$image" >/dev/null 2>&1; then
     printf 'Removing %s\n' "$image"
-    docker image rm "$image"
+    docker image rm --force "$image"
   else
     printf 'Image not found, skipping: %s\n' "$image"
   fi

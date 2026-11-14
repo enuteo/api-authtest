@@ -24,7 +24,7 @@ paths:
           schema:
             type: integer
             format: int64
-          example: 42
+          example: 1
       responses:
         '200':
           description: Object returned successfully.
@@ -34,13 +34,15 @@ paths:
                 $ref: '#/components/schemas/MyObject'
               example:
                 id: 1
-                name: null
+                name: First object
         '400':
           description: The path ID is not a valid 64-bit integer.
         '401':
           description: A valid bearer token is required.
         '403':
           description: The token does not have the objectrole role.
+        '404':
+          description: No object exists with the requested ID.
 components:
   securitySchemes:
     bearerAuth:
@@ -58,6 +60,5 @@ components:
           example: 1
         name:
           type: string
-          nullable: true
-          description: Object name; currently null in the placeholder response.
-          example: null
+          description: Object name stored in base_objects.
+          example: First object

@@ -1,0 +1,4 @@
+name: tcc-local
+
+include:
+  - path: ./scripts/setup/docker-compose.yaml

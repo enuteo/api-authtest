@@ -89,19 +89,19 @@ e imagens podem ser personalizados pelas variáveis `KEYCLOAK_ADMIN_USERNAME`,
 `KEYCLOAK_IMAGE`. Os containers usam volumes persistentes e o script não
 sobrescreve containers existentes com os nomes configurados.
 
-Como alternativa, `docker compose up` neste diretório usa
-`docker-compose.yaml`, sobe PostgreSQL, Keycloak e os serviços a partir das
-imagens `tcc/*:local` (construindo-as quando necessário) e importa o realm de
-`scripts/setup/authtest-realm.json`. Um serviço de inicialização configura as
-senhas das contas importadas a partir de `AUTHTEST_USER_PASSWORD`,
+Para iniciar a pilha integrada a partir da raiz de `api-authtest`, execute
+`docker compose up`. O arquivo `compose.yaml` inclui
+`scripts/setup/docker-compose.yaml`, que sobe PostgreSQL, Keycloak e os serviços
+a partir das imagens `tcc/*:local` (construindo-as quando necessário) e importa
+o realm de `scripts/setup/authtest-realm.json`. Um serviço de inicialização
+configura as senhas das contas importadas a partir de `AUTHTEST_USER_PASSWORD`,
 `AUTHTEST_ADMIN_PASSWORD` e `AUTHTEST_NOTUSER_PASSWORD`, cria `notuser` se
 necessário e preenche os atributos básicos do perfil exigidos para o login por
-senha. Para executar os testes após iniciar os
-serviços, use `docker compose --profile test run --rm api-authtest` no diretório
-`scripts/setup`. O relatório do Compose fica em
-`scripts/setup/reports/authtest-report-<timestamp>.txt`. O runner usa UID/GID `1000` por
-padrão para permitir a gravação no diretório montado; defina `AUTHTEST_UID` e
-`AUTHTEST_GID` conforme o usuário local, se necessário. Esse Compose usa
+senha. Para executar os testes após iniciar os serviços, use
+`docker compose --profile test run --rm api-authtest`. O relatório fica em
+`scripts/setup/reports/authtest-report-<timestamp>.txt`. O runner usa UID/GID
+`1000` por padrão para permitir a gravação no diretório montado; defina
+`AUTHTEST_UID` e `AUTHTEST_GID` conforme o usuário local, se necessário. Esse Compose usa
 credenciais locais de desenvolvimento por padrão; configure as variáveis de
 ambiente antes de expô-lo fora da sua máquina.
 
@@ -128,5 +128,6 @@ na pasta `api-authtest`:
 ```
 
 O script remove somente a tag `tcc/<serviço>:local` de cada serviço e então
-chama `build-images.sh` na raiz de `tcc`. Para outra tag, defina `IMAGE_TAG`
-antes de executar o script.
+chama `build-images.sh`, localizado em
+`api-authtest/scripts/setup/doc`, usando os diretórios dos serviços na raiz de
+`tcc`. Para outra tag, defina `IMAGE_TAG` antes de executar o script.

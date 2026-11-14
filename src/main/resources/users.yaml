@@ -4,9 +4,12 @@ authentication:
     - username: "${AUTHTEST_USER_USERNAME:user}"
       password: "${AUTHTEST_USER_PASSWORD:userpass}"
       roles: [user, objectrole]
+      objects: [1, 2]
     - username: "${AUTHTEST_ADMIN_USERNAME:admin}"
       password: "${AUTHTEST_ADMIN_PASSWORD:adminpass}"
       roles: [admin, objectrole]
+      objects: [2, 3]
     - username: "${AUTHTEST_NOTUSER_USERNAME:notuser}"
       password: "${AUTHTEST_NOTUSER_PASSWORD:notuserpass}"
       roles: []
+      objects: [1]

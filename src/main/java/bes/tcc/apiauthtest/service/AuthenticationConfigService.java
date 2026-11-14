@@ -54,10 +54,11 @@ public class AuthenticationConfigService {
 			String username = resolve(user, "username");
 			String password = resolve(user, "password");
 			List<String> roles = readRoles(user.get("roles"), username);
+			List<Long> objects = readObjects(user.get("objects"), username);
 			if (!usernames.add(username)) {
 				throw new IllegalArgumentException("Duplicate authentication username: " + username);
 			}
-			users.add(new AuthenticationUser(username, password, roles));
+			users.add(new AuthenticationUser(username, password, roles, objects));
 		}
 		return new AuthenticationConfig(url, users);
 	}
@@ -86,6 +87,30 @@ public class AuthenticationConfigService {
 			roles.add(role);
 		}
 		return List.copyOf(roles);
+	}
+
+	private List<Long> readObjects(Object value, String username) {
+		if (!(value instanceof List<?> entries)) {
+			throw new IllegalArgumentException("Objects for user '" + username + "' must be a list.");
+		}
+		List<Long> objects = new ArrayList<>();
+		for (Object entry : entries) {
+			if (!(entry instanceof Number number)) {
+				throw new IllegalArgumentException("Objects for user '" + username + "' must be positive integers.");
+			}
+			long id;
+			try {
+				id = Long.parseLong(number.toString());
+			} catch (NumberFormatException exception) {
+				throw new IllegalArgumentException(
+						"Objects for user '" + username + "' must be positive integers.", exception);
+			}
+			if (id <= 0) {
+				throw new IllegalArgumentException("Objects for user '" + username + "' must be positive integers.");
+			}
+			objects.add(id);
+		}
+		return List.copyOf(objects);
 	}
 
 	private void validateUrl(String url) {

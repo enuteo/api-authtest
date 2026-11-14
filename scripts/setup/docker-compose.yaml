@@ -16,6 +16,20 @@ services:
       retries: 20
       start_period: 10s
 
+  base-objects-init:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-keycloak}
+      PGUSER: ${POSTGRES_USER:-keycloak}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
+    volumes:
+      - ./database/base-objects.sql:/base-objects.sql:ro
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/base-objects.sql"]
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.5
     command: start-dev --http-port=8080 --import-realm
@@ -61,6 +75,13 @@ services:
     build:
       context: ../../../no-secure-api
     pull_policy: build
+    depends_on:
+      base-objects-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-keycloak}
+      DATABASE_USERNAME: ${POSTGRES_USER:-keycloak}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
     ports:
       - "8070:8080"
 
@@ -89,6 +110,8 @@ services:
       context: ../../../secure-api
     pull_policy: build
     depends_on:
+      base-objects-init:
+        condition: service_completed_successfully
       keycloak-provision:
         condition: service_completed_successfully
     ports:
@@ -97,6 +120,9 @@ services:
       KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/authtest
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/authtest/protocol/openid-connect/certs
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-auth-api-test}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-keycloak}
+      DATABASE_USERNAME: ${POSTGRES_USER:-keycloak}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-keycloakpass}
 
   auth-api:
     image: tcc/auth-api:${IMAGE_TAG:-local}

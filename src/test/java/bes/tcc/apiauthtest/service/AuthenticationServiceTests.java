@@ -30,6 +30,7 @@ class AuthenticationServiceTests {
 	private final List<String> loginBodies = new CopyOnWriteArrayList<>();
 	private final List<String> authorizationHeaders = new CopyOnWriteArrayList<>();
 	private final List<String> anonymousAuthorizationHeaders = new CopyOnWriteArrayList<>();
+	private final List<String> requestPaths = new CopyOnWriteArrayList<>();
 
 	@BeforeEach
 	void startServer() throws IOException {
@@ -43,6 +44,7 @@ class AuthenticationServiceTests {
 					+ "\",\"token_type\":\"Bearer\",\"expires_in\":300}");
 		});
 		server.createContext("/object", exchange -> {
+			requestPaths.add(exchange.getRequestURI().getPath());
 			String authorization = exchange.getRequestHeaders().getFirst("Authorization");
 			if (authorization == null) {
 				anonymousAuthorizationHeaders.add("<none>");
@@ -75,12 +77,15 @@ class AuthenticationServiceTests {
 				    - username: yaml-user
 				      password: "${AUTHTEST_USER_PASSWORD}"
 				      roles: [user, objectrole]
+				      objects: [1, 2]
 				    - username: yaml-admin
 				      password: "${AUTHTEST_ADMIN_PASSWORD}"
 				      roles: [admin, objectrole]
+				      objects: [2]
 				    - username: yaml-notuser
 				      password: "${AUTHTEST_NOTUSER_PASSWORD}"
 				      roles: []
+				      objects: [3]
 				""";
 		AuthenticationConfigService configService = new AuthenticationConfigService(
 				new ByteArrayResource(usersYaml.getBytes(StandardCharsets.UTF_8)), environment);
@@ -99,25 +104,29 @@ class AuthenticationServiceTests {
 				tempDir.resolve("authtest-report.txt"));
 
 		assertEquals(List.of(
-				new AuthenticationUser("yaml-user", "user-password", List.of("user", "objectrole")),
-				new AuthenticationUser("yaml-admin", "admin-password", List.of("admin", "objectrole")),
-				new AuthenticationUser("yaml-notuser", "notuser-password", List.of())),
+				new AuthenticationUser("yaml-user", "user-password", List.of("user", "objectrole"), List.of(1L, 2L)),
+				new AuthenticationUser("yaml-admin", "admin-password", List.of("admin", "objectrole"), List.of(2L)),
+				new AuthenticationUser("yaml-notuser", "notuser-password", List.of(), List.of(3L))),
 				config.users());
 		assertEquals(3, loginBodies.size());
 		assertTrue(loginBodies.get(2).contains("\"yaml-notuser\""));
-		assertEquals(6, authorizationHeaders.size());
+		assertEquals(8, authorizationHeaders.size());
 		assertEquals(2, anonymousAuthorizationHeaders.size());
 		assertTrue(anonymousAuthorizationHeaders.stream().allMatch("<none>"::equals));
+		assertEquals(List.of("/object/1", "/object/2", "/object/1", "/object/2",
+				"/object/2", "/object/2", "/object/3", "/object/3", "/object/1", "/object/1"),
+				requestPaths);
 
 		assertTrue(reportPath.getFileName().toString()
 				.matches("authtest-report-\\d{8}T\\d{6}\\.\\d{9}Z\\.txt"));
 		String report = Files.readString(reportPath);
-		assertEquals(6, report.split("HTTP status: 200", -1).length - 1);
+		assertEquals(8, report.split("HTTP status: 200", -1).length - 1);
 		assertEquals(2, report.split("HTTP status: 401", -1).length - 1);
 		assertTrue(report.contains("User: yaml-user"));
 		assertTrue(report.contains("Roles: user, objectrole"));
 		assertTrue(report.contains("User: yaml-notuser"));
 		assertTrue(report.contains("Roles: \n"));
+		assertTrue(report.contains("Objects: [1, 2]"));
 		assertTrue(report.contains("User: (unauthenticated)"));
 		assertTrue(report.contains("Authentication: not attempted; no bearer token sent"));
 		assertTrue(report.contains("Endpoint: GET /object/{id}"));
