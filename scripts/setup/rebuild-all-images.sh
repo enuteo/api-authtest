@@ -4,7 +4,7 @@ set -Eeuo pipefail
 SETUP_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 TCC_ROOT="$(cd -- "$SETUP_ROOT/../../.." && pwd)"
 BUILD_SCRIPT="$SETUP_ROOT/doc/build-images.sh"
-IMAGE_TAG="${IMAGE_TAG:-local}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
 SERVICES=(
   api-authtest
   auth-api

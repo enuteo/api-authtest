@@ -1,0 +1,123 @@
+API Authtest execution report
+Generated: 2026-11-16T18:19:36.672330243-03:00
+Base URL: http://localhost:8070
+
+User: user
+Roles: user, objectrole
+Authentication: successful
+
+Endpoint: GET /object/{id}
+Object: objeto-do-user (owner: user)
+Expected access: ALLOWED (owner)
+Request URL: http://localhost:8070/object/1
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":1,"name":"First object"}
+
+Endpoint: GET /object/{id}
+Object: objeto-do-admin (owner: admin)
+Expected access: DENIED (not owner)
+Request URL: http://localhost:8070/object/2
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":2,"name":"Second object"}
+
+User: admin
+Roles: admin, objectrole
+Authentication: successful
+
+Endpoint: GET /object/{id}
+Object: objeto-do-user (owner: user)
+Expected access: DENIED (not owner)
+Request URL: http://localhost:8070/object/1
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":1,"name":"First object"}
+
+Endpoint: GET /object/{id}
+Object: objeto-do-admin (owner: admin)
+Expected access: ALLOWED (owner)
+Request URL: http://localhost:8070/object/2
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":2,"name":"Second object"}
+
+User: notuser
+Roles: 
+Authentication: successful
+
+Endpoint: GET /object/{id}
+Object: objeto-do-user (owner: user)
+Expected access: DENIED (not owner)
+Request URL: http://localhost:8070/object/1
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":1,"name":"First object"}
+
+Endpoint: GET /object/{id}
+Object: objeto-do-admin (owner: admin)
+Expected access: DENIED (not owner)
+Request URL: http://localhost:8070/object/2
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":2,"name":"Second object"}
+
+User: (unauthenticated)
+Roles: none
+Authentication: not attempted; no bearer token sent
+
+Endpoint: GET /object/{id}
+Object: objeto-do-user (owner: user)
+Expected access: DENIED (no credentials)
+Request URL: http://localhost:8070/object/1
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":1,"name":"First object"}
+
+Endpoint: GET /object/{id}
+Object: objeto-do-admin (owner: admin)
+Expected access: DENIED (no credentials)
+Request URL: http://localhost:8070/object/2
+HTTP version: HTTP_1_1
+HTTP status: 200
+Response headers:
+  content-type: application/json
+  date: Mon, 16 Nov 2026 21:19:37 GMT
+  transfer-encoding: chunked
+Response body:
+{"id":2,"name":"Second object"}
